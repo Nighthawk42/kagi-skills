@@ -1,0 +1,29 @@
+# Pin line endings in the repository to LF.
+#
+# The repository is already LF-clean; this makes that a property of the repo
+# rather than of each contributor's core.autocrlf setting. It matters most for
+# the wrapper scripts: a .sh stored with CRLF fails on Linux and macOS with
+# "bad interpreter: /usr/bin/env bash^M", and Go still compiles, so CI would
+# not catch it -- only the install would.
+* text=auto eol=lf
+
+# Executables and files consumed by tools that are strict about line endings.
+*.sh    text eol=lf
+Makefile text eol=lf
+*.go    text eol=lf
+*.mod   text eol=lf
+*.sum   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+
+# Windows-only scripts genuinely need CRLF.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Never touch binaries.
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.exe   binary
