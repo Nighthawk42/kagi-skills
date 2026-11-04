@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.0.1] - 2026-11-04
+
+### Security
+- The wrapper scripts' non-interactive guard failed open, downloading and
+  installing a binary with no consent. It gated on `[[ -t 0 || -e /dev/tty ]]`,
+  but under Git Bash `/dev/tty` passes `-e` while failing to open; the prompt's
+  `read ... < /dev/tty || reply=""` then swallowed that failure, leaving the
+  reply empty so that `"${reply:-Y}"` defaulted to yes. The scripts now probe
+  `/dev/tty` by opening it in a subshell and treat consent as an explicit
+  yes/no/unasked, where only a literal yes proceeds — both a refusal and an
+  unanswerable prompt stop.
+
+  Only the wrapper scripts were affected; the v2.0.0 binaries are unchanged
+  and need no reinstall. Anyone who checked out the `v2.0.0` tag should update
+  to get the corrected wrapper.
+
 ## [v2.0.0] - 2026-11-04
 
 Rewritten for the **Kagi API v1**. This fork takes over from the archived
@@ -125,7 +141,8 @@ release predates v1 and targeted endpoints Kagi now calls deprecated.
 - `Makefile` with `build`, `lint`, `test`, `fmt`, and `clean` targets
 - MIT license
 
-[Unreleased]: https://github.com/Nighthawk42/kagi-skills/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/Nighthawk42/kagi-skills/compare/v2.0.1...HEAD
+[v2.0.1]: https://github.com/Nighthawk42/kagi-skills/compare/v2.0.0...v2.0.1
 [v2.0.0]: https://github.com/Nighthawk42/kagi-skills/compare/v1.1.0...v2.0.0
 [v1.1.0]: https://github.com/joelazar/kagi-skills/compare/v1.0.0...v1.1.0
 [v1.0.0]: https://github.com/joelazar/kagi-skills/releases/tag/v1.0.0
