@@ -1,30 +1,41 @@
-SKILLS := kagi-search kagi-fastgpt kagi-summarizer kagi-enrich
+BINARIES := kagi-search kagi-extract
 
-.PHONY: build lint test fmt clean
+.PHONY: build test test-race lint fmt fmt-check vet clean check
 
+# Each binary is built into its skill directory's .bin/, where the wrapper
+# scripts look for it (<skill-dir>/.bin/<name>).
 build:
 	@set -e; \
-	for s in $(SKILLS); do \
-		echo "=== $$s ==="; \
-		(cd $$s && go build -o .bin/$$s .); \
-	done
-
-lint:
-	@set -e; \
-	for s in $(SKILLS); do \
-		echo "=== $$s ==="; \
-		(cd $$s && golangci-lint run --config ../.golangci.yml); \
+	for b in $(BINARIES); do \
+		echo "=== $$b ==="; \
+		go build -o $$b/.bin/$$b ./cmd/$$b; \
 	done
 
 test:
-	@set -e; \
-	for s in $(SKILLS); do \
-		echo "=== $$s ==="; \
-		(cd $$s && go test ./...); \
-	done
+	go test ./...
+
+test-race:
+	go test -race ./...
+
+lint:
+	golangci-lint run --config .golangci.yml ./...
 
 fmt:
 	gofumpt -w -l .
 
+# Fails (and lists the files) if any file needs formatting.
+fmt-check:
+	@files=$$(gofumpt -l .); \
+	if [ -n "$$files" ]; then \
+		echo "Files need formatting (run: make fmt):"; \
+		echo "$$files"; \
+		exit 1; \
+	fi
+
+vet:
+	go vet ./...
+
 clean:
-	@for s in $(SKILLS); do rm -f $$s/.bin/$$s; done
+	rm -rf $(addsuffix /.bin,$(BINARIES)) dist
+
+check: fmt-check vet test lint
