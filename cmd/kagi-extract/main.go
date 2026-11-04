@@ -167,15 +167,22 @@ func parse(argv []string) (*options, error) {
 	return opts, nil
 }
 
-func readURLsFromStdin() ([]string, error) {
+// stdinIsPiped reports whether stdin has data piped into it rather than being
+// an interactive terminal. A Stat failure tells us nothing useful either way,
+// so it counts as "not piped" and the caller reports the missing URL instead.
+func stdinIsPiped() bool {
 	stat, err := os.Stdin.Stat()
-	if err != nil || (stat.Mode()&os.ModeCharDevice) != 0 {
+	return err == nil && stat.Mode()&os.ModeCharDevice == 0
+}
+
+func readURLsFromStdin() ([]string, error) {
+	if !stdinIsPiped() {
 		return nil, nil
 	}
 	var urls []string
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		for _, field := range strings.Fields(scanner.Text()) {
+		for field := range strings.FieldsSeq(scanner.Text()) {
 			urls = append(urls, field)
 		}
 	}
@@ -220,7 +227,7 @@ func printText(opts *options, resp *kagi.ExtractResponse) error {
 	}
 
 	if failed > 0 && failed >= len(resp.Data) {
-		return fmt.Errorf("extraction failed for every requested page")
+		return errors.New("extraction failed for every requested page")
 	}
 	return nil
 }

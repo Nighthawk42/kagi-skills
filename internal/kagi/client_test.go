@@ -244,6 +244,8 @@ func TestNonRetryableStatusIsSingleAttempt(t *testing.T) {
 }
 
 func TestRetryableStatusesAreRetriedThenFail(t *testing.T) {
+	t.Parallel()
+
 	statuses := []int{
 		http.StatusTooManyRequests,
 		http.StatusInternalServerError,

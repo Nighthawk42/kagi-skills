@@ -2,7 +2,7 @@ package kagi
 
 import (
 	"context"
-	"fmt"
+	"errors"
 )
 
 // Workflow selects which category of results Kagi returns.
@@ -223,7 +223,7 @@ func (d *SearchData) Total() int {
 // Search performs a web search.
 func (c *Client) Search(ctx context.Context, req SearchRequest) (*SearchResponse, error) {
 	if req.Query == "" {
-		return nil, fmt.Errorf("query is required")
+		return nil, errors.New("query is required")
 	}
 	var out SearchResponse
 	if err := c.postJSON(ctx, "search", req, &out, nil); err != nil {
@@ -236,7 +236,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) (*SearchResponse
 // serialisation verbatim, rather than JSON.
 func (c *Client) SearchMarkdown(ctx context.Context, req SearchRequest) (string, error) {
 	if req.Query == "" {
-		return "", fmt.Errorf("query is required")
+		return "", errors.New("query is required")
 	}
 	req.Format = "markdown"
 	var raw string

@@ -323,8 +323,7 @@ func parseRetryAfter(header http.Header) time.Duration {
 }
 
 func lastRetryAfter(err error) time.Duration {
-	var apiErr *APIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*APIError](err); ok {
 		return apiErr.retryAfter
 	}
 	return 0
