@@ -152,26 +152,38 @@ if [[ "$needs_build" -eq 1 ]]; then
     CHECKSUMS_URL="https://github.com/$REPO/releases/download/${TAG}/checksums.txt"
 
     # Downloading and running an executable deserves consent. When there is no
-    # terminal to ask at -- which is the common case, since these skills are
-    # invoked by agents -- refuse rather than silently fetching a binary.
+    # terminal to ask at -- the common case, since these skills are invoked by
+    # agents -- refuse rather than silently fetching a binary.
+    #
+    # Note that testing for /dev/tty with -e is not enough: under Git Bash the
+    # path exists but cannot be opened. Probe it in a subshell, so a failure
+    # cannot take down this shell, and treat anything other than an explicit
+    # yes as a refusal.
     if [[ "${KAGI_SKILLS_ASSUME_YES:-}" != "1" ]]; then
-      if [[ -t 0 || -e /dev/tty ]]; then
+      consent="unasked"
+      if (exec 3< /dev/tty) 2>/dev/null; then
         echo "$BIN_NAME is not installed. Download the pre-built binary?" >&2
         echo "  $URL" >&2
         reply=""
-        read -r -p "Download? [Y/n] " reply < /dev/tty || reply=""
-        case "${reply:-Y}" in
-          [Yy]* | "") ;;
-          *)
-            echo "Aborted." >&2
-            exit 1
-            ;;
-        esac
-      else
+        if read -r -p "Download? [Y/n] " reply < /dev/tty; then
+          case "${reply:-Y}" in
+            [Yy]* | "") consent="yes" ;;
+            *) consent="no" ;;
+          esac
+        fi
+      fi
+
+      if [[ "$consent" == "no" ]]; then
+        echo "Aborted." >&2
+        exit 1
+      fi
+
+      if [[ "$consent" != "yes" ]]; then
         echo "Error: $BIN_NAME is not installed and there is no terminal to confirm a download." >&2
         echo "" >&2
         echo "Pick one:" >&2
-        echo "  * Install Go 1.26+ and re-run; this wrapper then builds from source." >&2
+        echo "  * Install Go 1.26+ and run from a source checkout; this wrapper" >&2
+        echo "    then builds from source." >&2
         echo "  * Run this once from an interactive shell to install it." >&2
         echo "  * Set KAGI_SKILLS_ASSUME_YES=1 to allow the download:" >&2
         echo "      $URL" >&2
