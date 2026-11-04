@@ -10,47 +10,63 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.skill }} / ${{ matrix.platform.goos }}_${{ matrix.platform.goarch }}
+    name: Build ${{ matrix.binary }} / ${{ matrix.platform.goos }}_${{ matrix.platform.goarch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        skill:
+        binary:
           - kagi-search
-          - kagi-fastgpt
-          - kagi-summarizer
-          - kagi-enrich
+          - kagi-extract
         platform:
           - { goos: linux,   goarch: amd64 }
           - { goos: linux,   goarch: arm64 }
           - { goos: darwin,  goarch: amd64 }
           - { goos: darwin,  goarch: arm64 }
           - { goos: windows, goarch: amd64 }
+          - { goos: windows, goarch: arm64 }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
-          go-version-file: ${{ matrix.skill }}/go.mod
+          go-version-file: go.mod
 
       - name: Build binary
         env:
           GOOS: ${{ matrix.platform.goos }}
           GOARCH: ${{ matrix.platform.goarch }}
           CGO_ENABLED: "0"
+          BINARY_NAME: ${{ matrix.binary }}
+          TAG: ${{ github.ref_name }}
         run: |
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
-          BINARY="${{ matrix.skill }}_${{ github.ref_name }}_${GOOS}_${GOARCH}${EXT}"
-          cd ${{ matrix.skill }}
-          go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o "../dist/${BINARY}" .
+          # The wrapper scripts download this exact filename; do not change it.
+          BINARY="${BINARY_NAME}_${TAG}_${GOOS}_${GOARCH}${EXT}"
+          go build -trimpath \
+            -ldflags="-s -w -X github.com/Nighthawk42/kagi-skills/internal/cli.Version=${TAG}" \
+            -o "dist/${BINARY}" "./cmd/${BINARY_NAME}"
           echo "Built: dist/${BINARY}"
 
+      - name: Verify version injection
+        if: matrix.platform.goos == 'linux' && matrix.platform.goarch == 'amd64'
+        env:
+          BINARY_NAME: ${{ matrix.binary }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          out=$("dist/${BINARY_NAME}_${TAG}_linux_amd64" --version)
+          echo "$out"
+          if [ "$out" != "${BINARY_NAME} ${TAG}" ]; then
+            echo "Version was not injected (expected '${BINARY_NAME} ${TAG}'); check the -X ldflags path."
+            exit 1
+          fi
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.skill }}_${{ matrix.platform.goos }}_${{ matrix.platform.goarch }}
+          name: ${{ matrix.binary }}_${{ matrix.platform.goos }}_${{ matrix.platform.goarch }}
           path: dist/
           if-no-files-found: error
 
@@ -60,10 +76,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist/
           merge-multiple: true
@@ -98,7 +114,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/*

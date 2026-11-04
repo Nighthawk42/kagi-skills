@@ -1,144 +1,170 @@
 ---
 name: kagi-search
-description: Fast web search and content extraction via Kagi Search API. Uses a Go backend for quick startup and supports JSON output.
+description: Web search via Kagi's Search API — high-quality, ad-free results with optional full page content, news/image/video/podcast modes, domain and date filtering, and Kagi lenses. Also surfaces small-web finds, infoboxes and related searches. Use when you need current information from the web or want to find authoritative sources on a topic.
 ---
 
 # Kagi Search
 
-Fast web search and content extraction using the official Kagi Search API.
+Web search through [Kagi's Search API v1](https://help.kagi.com/kagi/api/search.html). Kagi is a paid, ad-free search engine, so results are ranked for relevance rather than engagement, which makes them markedly cleaner to feed to a model than ad-supported alternatives.
 
-This skill uses a Go binary for fast startup and no runtime dependencies. The binary can be downloaded pre-built or compiled from source.
+A static Go binary, so startup is instant and there is no runtime to install.
 
 ## Setup
 
-Requires a Kagi account with API access enabled.
-
-1. Create an account at https://kagi.com/signup
-2. Navigate to Settings -> Advanced -> API portal: https://kagi.com/settings/api
-3. Generate an API Token
-4. Add funds to your API balance at: https://kagi.com/settings/billing_api
-5. Add to your shell profile (`~/.profile` or `~/.zprofile` for zsh):
+1. Generate a **Kagi API v1 key** at <https://kagi.com/api/keys>
+2. Export it:
    ```bash
-   export KAGI_API_KEY="your-api-key-here"
+   export KAGI_API_KEY="your-key-here"
    ```
-6. Install the binary — see [Installation](#installation) below
 
-## Installation
+> **A v1 key is required.** Keys issued for Kagi's older v0 API return `401 Unauthorized` here. If you see a 401, generate a fresh key at the link above.
 
-### Option A — Download pre-built binary (no Go required)
+**Cost:** $12 per 1,000 searches ($0.012 each). Adding `--extract` additionally bills at the Extract API rate of $4 per 1,000 pages. Check your balance at <https://kagi.com/api/billing>.
 
-```bash
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)        ARCH="amd64" ;;
-  aarch64|arm64) ARCH="arm64" ;;
-esac
-
-TAG=$(curl -fsSL "https://api.github.com/repos/joelazar/kagi-skills/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
-BINARY="kagi-search_${TAG}_${OS}_${ARCH}"
-
-mkdir -p {baseDir}/.bin
-curl -fsSL "https://github.com/joelazar/kagi-skills/releases/download/${TAG}/${BINARY}" \
-  -o {baseDir}/.bin/kagi-search
-chmod +x {baseDir}/.bin/kagi-search
-
-# Verify checksum (recommended)
-curl -fsSL "https://github.com/joelazar/kagi-skills/releases/download/${TAG}/checksums.txt" | \
-  grep "${BINARY}" | sha256sum --check
-```
-
-Pre-built binaries are available for Linux and macOS (amd64 + arm64) and Windows (amd64).
-
-### Option B — Build from source (requires Go 1.26+)
+## Usage
 
 ```bash
-cd {baseDir} && go build -o .bin/kagi-search .
+kagi-search <query> [options]
 ```
 
-Alternatively, just run `{baseDir}/kagi-search.sh` directly — the wrapper auto-builds on first run if Go is available.
+The first run builds the binary from source if Go 1.26+ is present; otherwise it offers a checksum-verified download.
 
-## Pricing
-
-The Kagi Search API is priced at $25 for 1000 queries (2.5 cents per search).
-
-## Search
+### Common cases
 
 ```bash
-{baseDir}/kagi-search.sh search "query"                              # Basic search (10 results)
-{baseDir}/kagi-search.sh search "query" -n 20                        # More results (max 100)
-{baseDir}/kagi-search.sh search "query" --content                    # Include extracted page content
-{baseDir}/kagi-search.sh search "query" --json                       # JSON output
-{baseDir}/kagi-search.sh search "query" --show-balance               # Show API balance for this call
-{baseDir}/kagi-search.sh search "query" -n 5 --content --json        # Combined options
+# Plain search
+kagi-search "go generics tutorial"
+
+# Fewer results, structured output
+kagi-search "rust async runtime" -n 5 --json
+
+# Restrict to specific sites
+kagi-search "context cancellation" --site go.dev,pkg.go.dev
+
+# Recent news
+kagi-search "kubernetes release" --news --since week
+
+# Search and read the top result in one request
+kagi-search "attention is all you need" --extract 1
 ```
 
-### Search options
+### Options
 
-- `-n <num>` - Number of results (default: 10, max: 100)
-- `--content` - Fetch and include page content for each result
-- `--json` - Emit JSON output
-- `--show-balance` - Print API balance to stderr for this call
-- `--timeout <sec>` - HTTP timeout in seconds (default: 15)
-- `--max-content-chars <num>` - Max chars per fetched result content (default: 5000)
+| Option | Description |
+|---|---|
+| `-n, --limit <1-1024>` | Max results **per category** (default: 10) |
+| `--page <1-10>` | Result page |
+| `-w, --workflow <name>` | `search` (default), `news`, `images`, `videos`, `podcasts` |
+| `--news` `--images` `--videos` `--podcasts` | Shorthands for `--workflow` |
+| `--only <names>` | Show only these categories, comma-separated |
+| `--extract <1-10>` | Also fetch full page markdown for the top N results, inline |
+| `--extract-chars <n>` | Truncate each extracted page (default: 20000, `0` = unlimited) |
+| `--site <domains>` | Restrict to these domains (repeatable, comma-separated) |
+| `--exclude-site <domains>` | Exclude these domains |
+| `--keyword <words>` | Require these keywords |
+| `--exclude-keyword <words>` | Exclude these keywords |
+| `--file-type <ext>` | Restrict to a file type, e.g. `pdf` |
+| `--since <day\|week\|month>` | Published within the last period |
+| `--after <date>` / `--before <date>` | Published on or after / before, e.g. `2026-01-15` |
+| `--region <code>` | ISO 3166-1 alpha-2 country code |
+| `--unsafe` | Disable safe search |
+| `--lens <id\|url>` | Apply a Kagi lens (see below) |
+| `--json` | Emit JSON |
+| `--markdown` | Emit Kagi's experimental markdown serialisation |
+| `--meta` | Print timing and trace id to stderr |
+| `--timeout <sec>` | HTTP timeout (default: 30) |
+| `--api-timeout <0.5-4>` | Server-side search budget, in seconds |
 
-## Extract Page Content
+`--site`, `--exclude-site`, `--keyword`, `--exclude-keyword`, `--file-type` and `--since` together form an inline lens, and are therefore **mutually exclusive with `--lens`** — Kagi silently ignores `lens_id` when inline lens options are present, so the tool refuses the combination rather than dropping your filters.
+
+### Lenses
+
+`--lens` narrows a search to a curated set of sources. Built-in IDs:
+
+| ID | Lens |
+|---|---|
+| `1` | Forums |
+| `2` | Academic |
+| `15` | Programming |
+| `29` | News 360 |
+| `107` | Small Web |
+| `120` | Recipes |
+
+You can also pass a custom lens ID or full URL from <https://kagi.com/settings/lenses> (it must be set to shareable).
 
 ```bash
-{baseDir}/kagi-search.sh content https://example.com/article
-{baseDir}/kagi-search.sh content https://example.com/article --json
+kagi-search "monad transformers" --lens 2        # academic sources
+kagi-search "self-hosting" --lens 107            # small web
 ```
 
-### Content options
+### Result categories
 
-- `--json` - Emit JSON output
-- `--timeout <sec>` - HTTP timeout in seconds (default: 20)
-- `--max-chars <num>` - Max chars to output (default: 20000)
+Kagi groups results by category, and a single query often returns several. Text output prints each as its own section; `--json` keys them under `collections`.
 
-## API Balance
+The ones you'll see most: `search` (web pages), `news`, `video`, `image`, `related_search` (query suggestions), `infobox` (summary of a person/place/thing), and **`interesting_finds`** — Kagi's small-web index of independent, non-commercial sites. Also possible: `direct_answer` (for maths and unit conversions), `adjacent_question`, `interesting_news`, `code`, `listicle`, `weather`, `public_records`, `package_tracking`, `web_archive`, `podcast`, `podcast_creator`.
 
-Balance is not printed by default. You can either:
-
-- add `--show-balance` to `search`
-- run the dedicated command:
+Narrow the noise with `--only`:
 
 ```bash
-{baseDir}/kagi-search.sh balance
-{baseDir}/kagi-search.sh balance --json
+kagi-search "steve jobs" --only search              # just web results
+kagi-search "cool blogs" --only interesting_finds   # just small-web finds
+kagi-search "rust" --only search,related_search
 ```
 
-## Output
+`--only` accepts the API's category names plus a few aliases: `web`/`results` → `search`, `related` → `related_search`, `smallweb`/`small-web`/`finds` → `interesting_finds`.
 
-### Default (text)
+### Reading page content
 
-`kagi-search search` prints readable text blocks, and `kagi-search content` prints extracted content.
+`--extract N` replaces the snippet of each of the top N web results with the page's full markdown, in the same request. This is the cheapest way to search and read together.
 
-### JSON (`--json`)
+```bash
+kagi-search "python asyncio gather" --extract 2 --json
+```
 
-`kagi-search search --json` returns:
+In `--json` output an extracted result carries `content` instead of `snippet`. Extracted markdown is deliberately **not** HTML-cleaned, so code samples survive intact.
 
-- `query`
-- `meta` (includes API metadata like `ms`, `api_balance` when provided)
-- `results[]` with `title`, `link`, `snippet`, optional `published`, optional `content`
-- `related_searches[]`
+To extract pages you already have URLs for, use the companion `kagi-extract` skill instead — and prefer it when you have several URLs, since it fetches up to 10 concurrently.
 
-`kagi-search content --json` returns:
+## JSON output
 
-- `url`
-- `title`
-- `content`
-- `error` (only when extraction fails)
+```json
+{
+  "query": "personal blog",
+  "workflow": "search",
+  "collections": {
+    "search": [
+      {
+        "title": "Is This A Personal Blog?",
+        "url": "https://axxuy.com/blog/2026/is-this-a-personal-blog/",
+        "snippet": "...",
+        "published": "2026-04-03",
+        "language": "en"
+      }
+    ],
+    "related_search": [{ "title": "personal blog website", "url": "/search?q=..." }]
+  },
+  "total": 12,
+  "meta": { "trace": "637169aa...", "node": "us-central1", "ms": 1474 }
+}
+```
 
-## When to Use
+Titles and snippets are cleaned of HTML entities and highlight markup before output. `related_search` URLs are site-relative — use the `title`, which is the suggested query.
 
-- Searching for documentation or API references
-- Looking up facts or current information
-- Fetching content from specific URLs
-- Any task requiring web search without interactive browsing
+## Notes for agents
 
-## Notes
+- `--limit` caps each category independently, so a `search` workflow can return more rows than `--limit` in total. Single-category workflows (`--news`, `--images`, …) cap the total.
+- Prefer one request with `--extract` over a search followed by separate fetches.
+- Pipe to `kagi-extract` when you need more pages than `--extract` covered:
+  ```bash
+  kagi-search "rust book" --json | jq -r '.collections.search[].url' | head -5 | kagi-extract
+  ```
+- `--meta` prints a trace id; quote it to <developers@kagi.com> when reporting an API problem.
+- Transient `429` and `5xx` responses are retried automatically with backoff (`KAGI_MAX_RETRIES`, default 2).
 
-- Search results inherit your Kagi account settings (personalized results, blocked/promoted sites)
-- Results may include related search suggestions (`t:1` objects)
-- Content extraction uses `codeberg.org/readeck/go-readability/v2` (Readability v2)
-- The binary lives at `{baseDir}/.bin/kagi-search`; the wrapper rebuilds it automatically when source changes (requires Go)
+## Environment
+
+| Variable | Purpose |
+|---|---|
+| `KAGI_API_KEY` | **Required.** A Kagi API v1 key. |
+| `KAGI_MAX_RETRIES` | Retries on 429/5xx (default: `2`). |
+| `KAGI_SKILLS_ASSUME_YES` | Set to `1` to let the wrapper download a pre-built binary without prompting. |

@@ -1,0 +1,9 @@
+# Built binaries (wrappers build into each skill's .bin/)
+.bin/
+
+# Release artifacts
+/dist/
+
+# Go test and coverage output
+*.out
+*.test
