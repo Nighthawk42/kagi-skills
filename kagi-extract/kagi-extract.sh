@@ -99,7 +99,14 @@ if [[ "$needs_build" -eq 1 ]]; then
   if [[ "$HAVE_SOURCE" -eq 1 ]] && command -v go >/dev/null 2>&1; then
     if go_version_ok; then
       echo "Building $BIN_NAME from source..." >&2
-      (cd "$REPO_ROOT" && go build -o "$BIN" "./cmd/$BIN_NAME")
+      # Inject a version so --version and bug reports identify the build,
+      # rather than every source build calling itself "dev".
+      VERSION="$(cd "$REPO_ROOT" && git describe --tags --always --dirty 2>/dev/null || true)"
+      LDFLAGS="-s -w"
+      if [[ -n "$VERSION" ]]; then
+        LDFLAGS="$LDFLAGS -X github.com/Nighthawk42/kagi-skills/internal/cli.Version=$VERSION"
+      fi
+      (cd "$REPO_ROOT" && go build -ldflags "$LDFLAGS" -o "$BIN" "./cmd/$BIN_NAME")
     else
       echo "Warning: Go 1.26+ is required to build; found $(go env GOVERSION 2>/dev/null)." >&2
       echo "Falling back to a pre-built binary." >&2
