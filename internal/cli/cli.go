@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -85,25 +86,7 @@ func (a *Args) Flag() string { return a.curFlag }
 
 // Is reports whether the current flag matches any of the given names.
 func (a *Args) Is(names ...string) bool {
-	for _, n := range names {
-		if a.curFlag == n {
-			return true
-		}
-	}
-	return false
-}
-
-// value consumes and returns the flag's argument, accepting both
-// "--flag value" and "--flag=value".
-func (a *Args) value() (string, error) {
-	if a.hasInline {
-		return a.inlineValue, nil
-	}
-	if a.i+1 >= len(a.args) {
-		return "", fmt.Errorf("missing value for %s", a.curFlag)
-	}
-	a.i++
-	return a.args[a.i], nil
+	return slices.Contains(names, a.curFlag)
 }
 
 // String consumes the flag's argument as a string.
@@ -172,10 +155,8 @@ func (a *Args) Enum(allowed ...string) (string, error) {
 		return "", err
 	}
 	got := strings.ToLower(strings.TrimSpace(raw))
-	for _, want := range allowed {
-		if got == want {
-			return got, nil
-		}
+	if slices.Contains(allowed, got) {
+		return got, nil
 	}
 	return "", fmt.Errorf("invalid value for %s: %q (valid: %s)",
 		a.Flag(), raw, strings.Join(allowed, ", "))
@@ -188,7 +169,7 @@ func (a *Args) StringList(dst []string) ([]string, error) {
 	if err != nil {
 		return dst, err
 	}
-	for _, part := range strings.Split(raw, ",") {
+	for part := range strings.SplitSeq(raw, ",") {
 		if p := strings.TrimSpace(part); p != "" {
 			dst = append(dst, p)
 		}
@@ -204,4 +185,17 @@ func (a *Args) Unknown() error {
 // Query joins the collected positionals into a single query string.
 func (a *Args) Query() string {
 	return strings.TrimSpace(strings.Join(a.Positionals, " "))
+}
+
+// value consumes and returns the flag's argument, accepting both
+// "--flag value" and "--flag=value".
+func (a *Args) value() (string, error) {
+	if a.hasInline {
+		return a.inlineValue, nil
+	}
+	if a.i+1 >= len(a.args) {
+		return "", fmt.Errorf("missing value for %s", a.curFlag)
+	}
+	a.i++
+	return a.args[a.i], nil
 }

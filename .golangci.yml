@@ -10,6 +10,8 @@ linters:
     - cyclop
     - err113
     - exhaustruct
+    # Renamed upstream; without this the rejected linter above comes back.
+    - exhaustruct_v5
     - forbidigo
     - gochecknoglobals
     - gocognit
@@ -20,6 +22,14 @@ linters:
     - noinlineerr
     - nonamedreturns
     - paralleltest
+    # depguard below covers the same ground and is already configured;
+    # gomodguard is deprecated in favour of gomodguard_v2 and only emits a
+    # deprecation warning here.
+    - gomodguard
+    # These tests deliberately exercise unexported identifiers (errorEnvelope,
+    # newAPIError, backoff, parseRetryAfter, Args.value), which an external
+    # _test package cannot reach.
+    - testpackage
     - tagliatelle
     - unqueryvet
     - varnamelen
@@ -65,12 +75,25 @@ linters:
           - gocyclo
           - gosec
           - funlen
+          # Repeated literals are the point of a table-driven test.
+          - goconst
+          # Non-Latin literals in tests are deliberate: the truncation tests
+          # need multi-byte input to prove they cut on rune boundaries.
+          - gosmopolitan
         path: _test\.go
       # G704 (SSRF) and G705 (XSS) are false positives for CLI tools that
       # intentionally call known API endpoints and write status to stderr.
       - linters:
           - gosec
         text: "G704|G705"
+      # ST1005 forbids punctuation and newlines in error strings. That rule
+      # exists for errors that get wrapped into a larger sentence, but these
+      # are printed verbatim to a human at the terminal and give multi-line
+      # setup instructions, so sentence punctuation is correct here.
+      - linters:
+          - staticcheck
+        text: "ST1005"
+        path: (internal/kagi/client\.go|cmd/)
     paths:
       - third_party$
       - builtin$

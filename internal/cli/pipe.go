@@ -22,8 +22,7 @@ func IsBrokenPipe(err error) bool {
 		errors.Is(err, fs.ErrClosed) {
 		return true
 	}
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
+	if errno, ok := errors.AsType[syscall.Errno](err); ok {
 		return isBrokenPipeErrno(errno)
 	}
 	return false
